@@ -1,7 +1,6 @@
 package meb
 
 import (
-	"log"
 	"sync"
 
 	"gopkg.in/mgo.v2"
@@ -37,7 +36,6 @@ func Drain(events <-chan Event, c DrainConfig) error {
 				if err != nil {
 					outerErr = err
 				}
-				log.Printf("wrote %d events", len(batch))
 			}
 		}(i)
 	}
