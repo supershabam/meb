@@ -2,75 +2,38 @@ package meb
 
 import (
 	"fmt"
-	"math/rand"
-	"sync"
+	"log"
 	"time"
 )
 
-type GenConfig struct {
-	Key    string
-	Period time.Duration
+type Generator struct {
+	From   time.Time
+	Until  time.Time
+	Step   time.Duration
+	Prefix string
+	IDs    []string
 	Value  func() float64
 }
 
-func Generate(done <-chan struct{}, c GenConfig) <-chan Event {
+func (g Generator) Generate() <-chan Event {
 	out := make(chan Event)
 	go func() {
 		defer close(out)
-		select {
-		case <-done:
-			return
-		case <-time.After(time.Duration(rand.Int63n(int64(c.Period)))):
-		}
-		t := time.NewTicker(c.Period)
-		defer t.Stop()
-		for {
-			select {
-			case <-done:
-				return
-			case now := <-t.C:
-				select {
-				case <-done:
-					return
-				case out <- Event{
-					Time:  now,
-					Key:   c.Key,
-					Value: c.Value(),
-				}:
+		count := 0
+		for t := g.From; t.Before(g.Until); t = t.Add(g.Step) {
+			for _, id := range g.IDs {
+				key := fmt.Sprintf("%s.%s", g.Prefix, id)
+				out <- Event{
+					Time:  t,
+					Key:   key,
+					Value: g.Value(),
+				}
+				count++
+				if count%1000 == 0 {
+					log.Printf("generated %d events", count)
 				}
 			}
 		}
-	}()
-	return out
-}
-
-type FloodConfig struct {
-	Count  int
-	Prefix string
-	Period time.Duration
-	Value  func() float64
-}
-
-func Flood(done <-chan struct{}, c FloodConfig) <-chan Event {
-	out := make(chan Event)
-	go func() {
-		defer close(out)
-		wg := sync.WaitGroup{}
-		wg.Add(c.Count)
-		for i := 0; i < c.Count; i++ {
-			go func(id int) {
-				defer wg.Done()
-				events := Generate(done, GenConfig{
-					Key:    fmt.Sprintf("%s.%d", c.Prefix, id),
-					Period: c.Period,
-					Value:  c.Value,
-				})
-				for event := range events {
-					out <- event
-				}
-			}(i)
-		}
-		wg.Wait()
 	}()
 	return out
 }

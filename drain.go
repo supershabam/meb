@@ -6,24 +6,25 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-type DrainConfig struct {
+type Drainer struct {
 	URL         string
 	Database    string
 	Collection  string
 	Concurrency int
 }
 
-func Drain(events <-chan Event, c DrainConfig) error {
-	session, err := mgo.Dial(c.URL)
+func (d Drainer) Drain(events <-chan Event) error {
+	session, err := mgo.Dial(d.URL)
 	if err != nil {
 		return err
 	}
-	coll := session.DB(c.Database).C(c.Collection)
+	coll := session.DB(d.Database).C(d.Collection)
 	wg := sync.WaitGroup{}
-	wg.Add(c.Concurrency)
+	wg.Add(d.Concurrency)
 	batches := batchEvents(100, events)
+	var once sync.Once
 	var outerErr error
-	for i := 0; i < c.Concurrency; i++ {
+	for i := 0; i < d.Concurrency; i++ {
 		go func(id int) {
 			defer wg.Done()
 			if outerErr != nil {
@@ -31,10 +32,14 @@ func Drain(events <-chan Event, c DrainConfig) error {
 			}
 			b := coll.Bulk()
 			for batch := range batches {
-				b.Insert(batch)
+				for _, event := range batch {
+					b.Insert(event)
+				}
 				_, err := b.Run()
 				if err != nil {
-					outerErr = err
+					once.Do(func() {
+						outerErr = err
+					})
 				}
 			}
 		}(i)

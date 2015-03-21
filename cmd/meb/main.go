@@ -4,44 +4,49 @@ import (
 	"flag"
 	"log"
 	"math/rand"
-	"os"
-	"os/signal"
+	"strconv"
 	"time"
 
 	"github.com/supershabam/meb"
 )
 
 var (
-	prefix      = flag.String("prefix", "droplet.cpu", "prefix for the keys")
-	count       = flag.Int("count", 10e3, "number of event generators")
-	period      = flag.Duration("period", time.Second, "period to generate events at")
-	url         = flag.String("url", "mongodb://localhost", "mongodb url")
-	database    = flag.String("database", "events", "mongodb database")
-	collection  = flag.String("collection", "events", "mongodb collection")
-	concurrency = flag.Int("concurrency", 20, "write concurrency")
+	prefix     = flag.String("prefix", "droplet.cpu", "prefix for the keys")
+	from       = flag.Duration("from", -time.Hour*2, "relative start time")
+	until      = flag.Duration("until", time.Millisecond, "relative end time")
+	step       = flag.Duration("step", time.Second, "time between values for a metric")
+	ids        = flag.Int("ids", 1000, "number of metric ids to generate")
+	url        = flag.String("url", "mongodb://localhost", "mongodb url")
+	database   = flag.String("database", "events", "mongodb database")
+	collection = flag.String("collection", "events", "mongodb collection")
 )
+
+func makeIDs(ids int) []string {
+	out := []string{}
+	for i := 0; i < ids; i++ {
+		out = append(out, strconv.Itoa(i))
+	}
+	return out
+}
 
 func main() {
 	flag.Parse()
-	done := make(chan struct{})
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, os.Kill)
-	go func() {
-		<-c
-		close(done)
-	}()
-	events := meb.Flood(done, meb.FloodConfig{
-		Count:  *count,
+	g := meb.Generator{
+		From:   time.Now().Add(*from),
+		Until:  time.Now().Add(*until),
+		Step:   *step,
 		Prefix: *prefix,
-		Period: *period,
+		IDs:    makeIDs(*ids),
 		Value:  func() float64 { return rand.NormFloat64() },
-	})
-	err := meb.Drain(events, meb.DrainConfig{
+	}
+	d := meb.Drainer{
 		URL:         *url,
 		Database:    *database,
 		Collection:  *collection,
-		Concurrency: *concurrency,
-	})
+		Concurrency: 2,
+	}
+	events := g.Generate()
+	err := d.Drain(events)
 	if err != nil {
 		log.Fatal(err)
 	}
