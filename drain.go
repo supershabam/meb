@@ -26,7 +26,7 @@ func (d Drainer) Drain(events <-chan Event) error {
 	coll := session.DB(d.Database).C(d.Collection)
 	wg := sync.WaitGroup{}
 	wg.Add(d.Concurrency)
-	batches := batchEvents(100, events)
+	batches := batchEvents(250, events)
 	var once sync.Once
 	var outerErr error
 	var count int64
@@ -36,8 +36,8 @@ func (d Drainer) Drain(events <-chan Event) error {
 			if outerErr != nil {
 				return
 			}
-			b := coll.Bulk()
 			for batch := range batches {
+				b := coll.Bulk()
 				for _, event := range batch {
 					b.Insert(event)
 				}
@@ -52,7 +52,7 @@ func (d Drainer) Drain(events <-chan Event) error {
 		}(i)
 	}
 	go func() {
-		c := time.Tick(time.Second * 5)
+		c := time.Tick(time.Second)
 		for {
 			select {
 			case <-done:
