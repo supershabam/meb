@@ -1,7 +1,10 @@
 package meb
 
 import (
+	"log"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"gopkg.in/mgo.v2"
 )
@@ -14,6 +17,8 @@ type Drainer struct {
 }
 
 func (d Drainer) Drain(events <-chan Event) error {
+	done := make(chan struct{})
+	defer close(done)
 	session, err := mgo.Dial(d.URL)
 	if err != nil {
 		return err
@@ -24,6 +29,7 @@ func (d Drainer) Drain(events <-chan Event) error {
 	batches := batchEvents(100, events)
 	var once sync.Once
 	var outerErr error
+	var count int64
 	for i := 0; i < d.Concurrency; i++ {
 		go func(id int) {
 			defer wg.Done()
@@ -41,9 +47,21 @@ func (d Drainer) Drain(events <-chan Event) error {
 						outerErr = err
 					})
 				}
+				atomic.AddInt64(&count, int64(len(batch)))
 			}
 		}(i)
 	}
+	go func() {
+		c := time.Tick(time.Second * 5)
+		for {
+			select {
+			case <-done:
+				return
+			case <-c:
+				log.Printf("wrote %d events", count)
+			}
+		}
+	}()
 	wg.Wait()
 	return outerErr
 }
