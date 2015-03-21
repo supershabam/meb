@@ -43,7 +43,7 @@ func main() {
 		URL:         *url,
 		Database:    *database,
 		Collection:  *collection,
-		Concurrency: 2,
+		Concurrency: 10,
 	}
 	events := g.Generate()
 	err := d.Drain(events)

@@ -3,6 +3,7 @@ package meb
 import (
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,9 +18,11 @@ type Generator struct {
 
 func (g Generator) Generate() <-chan Event {
 	out := make(chan Event)
+	done := make(chan struct{})
+	var count int64
 	go func() {
 		defer close(out)
-		count := 0
+		defer close(done)
 		for t := g.From; t.Before(g.Until); t = t.Add(g.Step) {
 			for _, id := range g.IDs {
 				key := fmt.Sprintf("%s.%s", g.Prefix, id)
@@ -28,10 +31,18 @@ func (g Generator) Generate() <-chan Event {
 					Key:   key,
 					Value: g.Value(),
 				}
-				count++
-				if count%1000 == 0 {
-					log.Printf("generated %d events", count)
-				}
+				atomic.AddInt64(&count, 1)
+			}
+		}
+	}()
+	go func() {
+		c := time.Tick(time.Second)
+		for {
+			select {
+			case <-done:
+				return
+			case <-c:
+				log.Printf("generated %d events", count)
 			}
 		}
 	}()
