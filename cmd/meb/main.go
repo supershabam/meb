@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 	"strconv"
@@ -45,19 +46,22 @@ func main() {
 		Collection:  *collection,
 		Concurrency: 10,
 	}
+	start := time.Now()
 	events := g.Generate()
 	h, err := d.Drain(events)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("%d total writes", h.Count())
-	log.Printf("0.005 - %.2fms", h.Percentile(0.005))
-	log.Printf("0.02  - %.2fms", h.Percentile(0.02))
-	log.Printf("0.09  - %.2fms", h.Percentile(0.09))
-	log.Printf("0.25  - %.2fms", h.Percentile(0.25))
-	log.Printf("0.50  - %.2fms", h.Percentile(0.50))
-	log.Printf("0.75  - %.2fms", h.Percentile(0.75))
-	log.Printf("0.91  - %.2fms", h.Percentile(0.91))
-	log.Printf("0.98  - %.2fms", h.Percentile(0.98))
-	log.Printf("0.995 - %.2fms", h.Percentile(0.995))
+	end := time.Now()
+	fmt.Printf("%d total writes completed in %s\n", h.Count(), end.Sub(start))
+	fmt.Println("write completion percentiles:")
+	fmt.Printf("0.005 - %.2fms\n", h.Percentile(0.005))
+	fmt.Printf("0.02  - %.2fms\n", h.Percentile(0.02))
+	fmt.Printf("0.09  - %.2fms\n", h.Percentile(0.09))
+	fmt.Printf("0.25  - %.2fms\n", h.Percentile(0.25))
+	fmt.Printf("0.50  - %.2fms\n", h.Percentile(0.50))
+	fmt.Printf("0.75  - %.2fms\n", h.Percentile(0.75))
+	fmt.Printf("0.91  - %.2fms\n", h.Percentile(0.91))
+	fmt.Printf("0.98  - %.2fms\n", h.Percentile(0.98))
+	fmt.Printf("0.995 - %.2fms\n", h.Percentile(0.995))
 }
