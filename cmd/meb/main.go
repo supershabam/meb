@@ -50,9 +50,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("%d events written", h.Count())
-	log.Printf("min  - %d", h.Min())
-	log.Printf("0.25 - %.2f", h.Percentile(0.25))
-	log.Printf("0.75 - %.2f", h.Percentile(0.75))
-	log.Printf("0.95 - %.2f", h.Percentile(0.95))
+	log.Printf("%d total writes", h.Count())
+	log.Printf("0.005 - %.2fms", h.Percentile(0.005))
+	log.Printf("0.02  - %.2fms", h.Percentile(0.02))
+	log.Printf("0.09  - %.2fms", h.Percentile(0.09))
+	log.Printf("0.25  - %.2fms", h.Percentile(0.25))
+	log.Printf("0.50  - %.2fms", h.Percentile(0.50))
+	log.Printf("0.75  - %.2fms", h.Percentile(0.75))
+	log.Printf("0.91  - %.2fms", h.Percentile(0.91))
+	log.Printf("0.98  - %.2fms", h.Percentile(0.98))
+	log.Printf("0.995 - %.2fms", h.Percentile(0.995))
 }
