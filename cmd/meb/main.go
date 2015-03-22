@@ -12,14 +12,16 @@ import (
 )
 
 var (
-	prefix     = flag.String("prefix", "droplet.cpu", "prefix for the keys")
-	from       = flag.Duration("from", -time.Second*2, "relative start time")
-	until      = flag.Duration("until", time.Millisecond, "relative end time")
-	step       = flag.Duration("step", time.Second, "time between values for a metric")
-	ids        = flag.Int("ids", 3, "number of metric ids to generate")
-	url        = flag.String("url", "mongodb://localhost", "mongodb url")
-	database   = flag.String("database", "events", "mongodb database")
-	collection = flag.String("collection", "events", "mongodb collection")
+	batch       = flag.Int("batch", 250, "number of inserts to batch into a single write")
+	concurrency = flag.Int("concurrency", 20, "number of goroutines to write batches")
+	prefix      = flag.String("prefix", "droplet.cpu", "prefix for the keys")
+	from        = flag.Duration("from", -time.Second*2, "relative start time")
+	until       = flag.Duration("until", time.Millisecond, "relative end time")
+	step        = flag.Duration("step", time.Second, "time between values for a metric")
+	ids         = flag.Int("ids", 3, "number of metric ids to generate")
+	url         = flag.String("url", "mongodb://localhost", "mongodb url")
+	database    = flag.String("database", "events", "mongodb database")
+	collection  = flag.String("collection", "events", "mongodb collection")
 )
 
 func makeIDs(ids int) []string {
@@ -44,7 +46,8 @@ func main() {
 		URL:         *url,
 		Database:    *database,
 		Collection:  *collection,
-		Concurrency: 10,
+		Concurrency: *concurrency,
+		Batch:       *batch,
 	}
 	start := time.Now()
 	events := g.Generate()

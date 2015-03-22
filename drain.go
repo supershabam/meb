@@ -14,6 +14,7 @@ type Drainer struct {
 	Database    string
 	Collection  string
 	Concurrency int
+	Batch       int
 }
 
 func (d Drainer) Drain(events <-chan Event) (metrics.Histogram, error) {
@@ -27,7 +28,7 @@ func (d Drainer) Drain(events <-chan Event) (metrics.Histogram, error) {
 	coll := session.DB(d.Database).C(d.Collection)
 	wg := sync.WaitGroup{}
 	wg.Add(d.Concurrency)
-	batches := batchEvents(250, events)
+	batches := batchEvents(d.Batch, events)
 	var once sync.Once
 	var outerErr error
 	for i := 0; i < d.Concurrency; i++ {
@@ -38,6 +39,7 @@ func (d Drainer) Drain(events <-chan Event) (metrics.Histogram, error) {
 			}
 			for batch := range batches {
 				b := coll.Bulk()
+				b.Unordered()
 				for _, event := range batch {
 					b.Insert(event)
 				}
