@@ -12,10 +12,10 @@ import (
 
 var (
 	prefix     = flag.String("prefix", "droplet.cpu", "prefix for the keys")
-	from       = flag.Duration("from", -time.Hour*2, "relative start time")
+	from       = flag.Duration("from", -time.Second*2, "relative start time")
 	until      = flag.Duration("until", time.Millisecond, "relative end time")
 	step       = flag.Duration("step", time.Second, "time between values for a metric")
-	ids        = flag.Int("ids", 1000, "number of metric ids to generate")
+	ids        = flag.Int("ids", 3, "number of metric ids to generate")
 	url        = flag.String("url", "mongodb://localhost", "mongodb url")
 	database   = flag.String("database", "events", "mongodb database")
 	collection = flag.String("collection", "events", "mongodb collection")
@@ -46,8 +46,13 @@ func main() {
 		Concurrency: 10,
 	}
 	events := g.Generate()
-	err := d.Drain(events)
+	h, err := d.Drain(events)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("%d events written", h.Count())
+	log.Printf("min  - %d", h.Min())
+	log.Printf("0.25 - %.2f", h.Percentile(0.25))
+	log.Printf("0.75 - %.2f", h.Percentile(0.75))
+	log.Printf("0.95 - %.2f", h.Percentile(0.95))
 }

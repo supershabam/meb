@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rcrowley/go-metrics"
 	"gopkg.in/mgo.v2"
 )
 
@@ -16,12 +17,13 @@ type Drainer struct {
 	Concurrency int
 }
 
-func (d Drainer) Drain(events <-chan Event) error {
+func (d Drainer) Drain(events <-chan Event) (metrics.Histogram, error) {
+	h := metrics.NewHistogram(metrics.NewUniformSample(1028))
 	done := make(chan struct{})
 	defer close(done)
 	session, err := mgo.Dial(d.URL)
 	if err != nil {
-		return err
+		return h, err
 	}
 	coll := session.DB(d.Database).C(d.Collection)
 	wg := sync.WaitGroup{}
@@ -41,12 +43,16 @@ func (d Drainer) Drain(events <-chan Event) error {
 				for _, event := range batch {
 					b.Insert(event)
 				}
+				start := time.Now()
 				_, err := b.Run()
 				if err != nil {
 					once.Do(func() {
 						outerErr = err
 					})
 				}
+				end := time.Now()
+				ms := end.Sub(start).Nanoseconds() / 1e6
+				h.Update(ms)
 				atomic.AddInt64(&count, int64(len(batch)))
 			}
 		}(i)
@@ -63,7 +69,7 @@ func (d Drainer) Drain(events <-chan Event) error {
 		}
 	}()
 	wg.Wait()
-	return outerErr
+	return h, outerErr
 }
 
 func batchEvents(size int, in <-chan Event) <-chan []Event {
