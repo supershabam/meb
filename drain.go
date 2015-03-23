@@ -9,6 +9,70 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
+type PerCollectionDrainer struct {
+	URL         string
+	Database    string
+	Concurrency int
+}
+
+type Datapoint struct {
+	At    time.Time `bson:"_id"`
+	Value float64   `bson:"value"`
+}
+
+func (d PerCollectionDrainer) Drain(events <-chan Event) (metrics.Histogram, error) {
+	h := metrics.NewHistogram(metrics.NewExpDecaySample(4098, 0.015))
+	done := make(chan struct{})
+	defer close(done)
+	session, err := mgo.Dial(d.URL)
+	if err != nil {
+		return h, err
+	}
+	db := session.DB(d.Database)
+	wg := sync.WaitGroup{}
+	wg.Add(d.Concurrency)
+	var once sync.Once
+	var outerErr error
+	for i := 0; i < d.Concurrency; i++ {
+		go func(id int) {
+			defer wg.Done()
+			if outerErr != nil {
+				return
+			}
+			for event := range events {
+				coll := db.C(event.Key)
+				d := Datapoint{
+					At:    event.Time,
+					Value: event.Value,
+				}
+				start := time.Now()
+				err := coll.Insert(d)
+				if err != nil {
+					once.Do(func() {
+						outerErr = err
+					})
+				}
+				end := time.Now()
+				ms := end.Sub(start).Nanoseconds() / 1e6
+				h.Update(ms)
+			}
+		}(i)
+	}
+	go func() {
+		c := time.Tick(time.Second)
+		for {
+			select {
+			case <-done:
+				return
+			case <-c:
+				log.Printf("wrote %d events with average %.2fms write time", h.Count(), h.Percentile(0.50))
+			}
+		}
+	}()
+	wg.Wait()
+	return h, outerErr
+}
+
 type Drainer struct {
 	URL         string
 	Database    string

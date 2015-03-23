@@ -42,12 +42,17 @@ func main() {
 		IDs:    makeIDs(*ids),
 		Value:  func() float64 { return rand.NormFloat64() },
 	}
-	d := meb.Drainer{
+	// d := meb.Drainer{
+	// 	URL:         *url,
+	// 	Database:    *database,
+	// 	Collection:  *collection,
+	// 	Concurrency: *concurrency,
+	// 	Batch:       *batch,
+	// }
+	d := meb.PerCollectionDrainer{
 		URL:         *url,
 		Database:    *database,
-		Collection:  *collection,
 		Concurrency: *concurrency,
-		Batch:       *batch,
 	}
 	start := time.Now()
 	events := g.Generate()
